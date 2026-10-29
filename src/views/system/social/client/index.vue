@@ -49,7 +49,7 @@
           />
         </el-select>
       </el-form-item>
-      <el-form-item label="客户端编号" prop="clientId">
+      <el-form-item label="客户端编号 / 应用编码" prop="clientId">
         <el-input
           v-model="queryParams.clientId"
           class="!w-240px"
@@ -105,7 +105,7 @@
           <dict-tag :type="DICT_TYPE.USER_TYPE" :value="scope.row.userType" />
         </template>
       </el-table-column>
-      <el-table-column align="center" label="客户端编号" prop="clientId" width="180px" />
+      <el-table-column align="center" label="客户端编号 / 应用编码" prop="clientId" width="180px" />
       <el-table-column align="center" label="状态" prop="status">
         <template #default="scope">
           <dict-tag :type="DICT_TYPE.COMMON_STATUS" :value="scope.row.status" />
