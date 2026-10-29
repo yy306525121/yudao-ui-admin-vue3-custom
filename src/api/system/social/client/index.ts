@@ -9,6 +9,9 @@ export interface SocialClientVO {
   clientSecret: string
   agentId: string
   status: number
+  casBaseUrl?: string
+  casService?: string
+  casTimeoutMillis?: number
 }
 
 // 查询社交客户端列表

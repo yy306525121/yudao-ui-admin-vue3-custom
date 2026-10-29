@@ -1,4 +1,5 @@
 import router from './router'
+import { captureNgiamCallback } from '@/utils/ngiam'
 import type { RouteRecordRaw } from 'vue-router'
 import { isRelogin } from '@/config/axios/service'
 import { getAccessToken } from '@/utils/auth'
@@ -60,6 +61,14 @@ const whiteList = [
 router.beforeEach(async (to, from, next) => {
   start()
   loadStart()
+  if (captureNgiamCallback()) {
+    next({ path: '/ngiam-callback', replace: true })
+    return
+  }
+  if (to.path === '/ngiam-callback') {
+    next()
+    return
+  }
   if (getAccessToken()) {
     if (to.path === '/login') {
       next({ path: '/' })

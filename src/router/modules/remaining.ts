@@ -195,6 +195,12 @@ const remainingRouter: AppRouteRecordRaw[] = [
     }
   },
   {
+    path: '/ngiam-callback',
+    component: () => import('@/views/Login/NgiamCallback.vue'),
+    name: 'NgiamCallback',
+    meta: { hidden: true, title: '公司统一登录', noTagsView: true }
+  },
+  {
     path: '/social-login',
     component: () => import('@/views/Login/SocialLogin.vue'),
     name: 'SocialLogin',

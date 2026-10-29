@@ -150,7 +150,8 @@
                   v-hasPermi="[
                     'system:user:delete',
                     'system:user:update-password',
-                    'system:permission:assign-user-role'
+                    'system:permission:assign-user-role',
+                    'system:ngiam-binding:query'
                   ]"
                 >
                   <el-button type="primary" link><Icon icon="ep:d-arrow-right" /> 更多</el-button>
@@ -174,6 +175,12 @@
                       >
                         <Icon icon="ep:circle-check" />分配角色
                       </el-dropdown-item>
+                      <el-dropdown-item
+                        command="handleNgiamBinding"
+                        v-if="checkPermi(['system:ngiam-binding:query'])"
+                      >
+                        <Icon icon="ep:connection" />IAM 绑定
+                      </el-dropdown-item>
                     </el-dropdown-menu>
                   </template>
                 </el-dropdown>
@@ -193,6 +200,7 @@
 
   <!-- 添加或修改用户对话框 -->
   <UserForm ref="formRef" @success="getList" />
+  <NgiamBindingForm ref="ngiamBindingRef" />
   <!-- 用户导入对话框 -->
   <UserImportForm ref="importFormRef" @success="getList" />
   <!-- 分配角色 -->
@@ -206,6 +214,7 @@ import download from '@/utils/download'
 import { CommonStatusEnum } from '@/utils/constants'
 import * as UserApi from '@/api/system/user'
 import UserForm from './UserForm.vue'
+import NgiamBindingForm from './NgiamBindingForm.vue'
 import UserImportForm from './UserImportForm.vue'
 import UserAssignRoleForm from './UserAssignRoleForm.vue'
 import DeptTree from './DeptTree.vue'
@@ -304,9 +313,14 @@ const handleExport = async () => {
   }
 }
 
+const ngiamBindingRef = ref<InstanceType<typeof NgiamBindingForm>>()
+
 /** 操作分发 */
 const handleCommand = (command: string, row: UserApi.UserVO) => {
   switch (command) {
+    case 'handleNgiamBinding':
+      ngiamBindingRef.value?.open(row)
+      break
     case 'handleDelete':
       handleDelete(row.id)
       break

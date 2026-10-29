@@ -125,6 +125,11 @@
           </div>
         </el-form-item>
       </el-col>
+      <el-col v-if="ngiamConfig.enabled" :span="24" class="mb-16px">
+        <el-button class="w-full" :loading="loginLoading" @click="doNgiamLogin"
+          >公司统一登录</el-button
+        >
+      </el-col>
       <el-divider content-position="center">萌新必读</el-divider>
       <el-col :span="24" style="padding-right: 10px; padding-left: 10px">
         <el-form-item>
@@ -153,6 +158,9 @@ import { useIcon } from '@/hooks/web/useIcon'
 import * as authUtil from '@/utils/auth'
 import { usePermissionStore } from '@/store/modules/permission'
 import * as LoginApi from '@/api/login'
+import { useDebounceFn } from '@vueuse/core'
+import { currentNgiamTenant, saveNgiamPending } from '@/utils/ngiam'
+import { isLocalNgiamPath } from '@/utils/ngiamState'
 import { LoginStateEnum, useFormValid, useLoginState } from './useLogin'
 
 defineOptions({ name: 'LoginForm' })
@@ -198,6 +206,64 @@ const socialList = [
   { icon: 'ant-design:github-filled', type: 0 },
   { icon: 'ant-design:alipay-circle-filled', type: 0 }
 ]
+
+const ngiamConfig = ref<LoginApi.NgiamConfig>({ enabled: false, service: null })
+let ngiamConfigRequest = 0
+const loadNgiamConfig = async () => {
+  const requestId = ++ngiamConfigRequest
+  ngiamConfig.value = { enabled: false, service: null }
+  const tenantName = loginData.loginForm.tenantName
+  try {
+    if (loginData.tenantEnable === 'true') {
+      if (!tenantName) return
+      const id = await LoginApi.getTenantIdByName(tenantName)
+      if (requestId !== ngiamConfigRequest || tenantName !== loginData.loginForm.tenantName || !id)
+        return
+      authUtil.setTenantId(id)
+    }
+    const tenant = currentNgiamTenant()
+    const config = await LoginApi.getNgiamConfig()
+    if (
+      requestId === ngiamConfigRequest &&
+      tenantName === loginData.loginForm.tenantName &&
+      tenant === currentNgiamTenant()
+    ) {
+      ngiamConfig.value = config
+    }
+  } catch {
+    // A tenant without a valid CAS application continues to use the existing login methods.
+  }
+}
+const debouncedNgiamConfig = useDebounceFn(loadNgiamConfig, 400)
+watch(
+  () => loginData.loginForm.tenantName,
+  () => {
+    ++ngiamConfigRequest
+    ngiamConfig.value = { enabled: false, service: null }
+    debouncedNgiamConfig()
+  }
+)
+const doNgiamLogin = async () => {
+  loginLoading.value = true
+  try {
+    await getTenantId()
+    const tenant = currentNgiamTenant()
+    const config = await LoginApi.getNgiamConfig()
+    if (!config.enabled || !config.service)
+      throw new Error('当前租户未启用公司统一登录，请联系管理员')
+    if (new URL(config.service).origin !== location.origin)
+      throw new Error('IAM 回调地址与当前站点不一致，请联系管理员')
+    const target = redirect.value || '/'
+    if (!isLocalNgiamPath(target)) throw new Error('登录后的跳转地址无效')
+    const url = await LoginApi.ngiamAuthRedirect(config.service, target)
+    const redirectUrl = saveNgiamPending(url, config.service, tenant)
+    location.assign(redirectUrl)
+  } catch (error) {
+    if (error instanceof Error) message.error(error.message)
+  } finally {
+    loginLoading.value = false
+  }
+}
 
 // 获取验证码
 const getCode = async () => {
@@ -326,9 +392,13 @@ watch(
     immediate: true
   }
 )
-onMounted(() => {
+onMounted(async () => {
   getLoginFormCache()
-  getTenantByWebsite()
+  try {
+    await getTenantByWebsite()
+  } finally {
+    await loadNgiamConfig()
+  }
 })
 </script>
 

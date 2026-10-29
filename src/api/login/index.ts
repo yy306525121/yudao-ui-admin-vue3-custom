@@ -58,7 +58,7 @@ export const smsLogin = (data: SmsLoginVO) => {
 }
 
 // 社交快捷登录，使用 code 授权码
-export function socialLogin(type: string, code: string, state: string) {
+export function socialLogin(type: string | number, code: string, state: string) {
   return request.post({
     url: '/system/auth/social-login',
     data: {
@@ -75,6 +75,19 @@ export const socialAuthRedirect = (type: number, redirectUri: string) => {
     url: '/system/auth/social-auth-redirect?type=' + type + '&redirectUri=' + redirectUri
   })
 }
+export interface NgiamConfig {
+  enabled: boolean
+  service: string | null
+}
+
+export const getNgiamConfig = () => request.get<NgiamConfig>({ url: '/system/auth/ngiam-config' })
+
+export const ngiamAuthRedirect = (redirectUri: string, returnPath: string) =>
+  request.get<string>({
+    url: '/system/auth/social-auth-redirect',
+    params: { type: 35, redirectUri, returnPath }
+  })
+
 // 获取验证图片以及 token
 export const getCode = (data) => {
   return request.postOriginal({ url: 'system/captcha/get', data })
