@@ -33,9 +33,7 @@ export const login = (data: UserLoginVO) => {
   return request.post({
     url: '/system/auth/login',
     data,
-    headers: {
-      isEncrypt: false
-    }
+    fieldCrypto: { request: ['password'], response: ['data.accessToken'] }
   })
 }
 
@@ -132,7 +130,7 @@ export const getCode = (data: any) => {
 }
 
 // 滑动或者点选验证
-export const reqCheck = (data: any) => {
+export const reqCheck = (data) => {
   return request.postOriginal({ url: 'system/captcha/check', data })
 }
 

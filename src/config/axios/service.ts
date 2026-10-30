@@ -1,4 +1,11 @@
-import axios, { AxiosError, AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
+import { fieldCrypto } from '@/utils/field-crypto/config'
+import { prepareFieldRequest } from '@/utils/field-crypto'
+import axios, {
+  AxiosError,
+  AxiosInstance,
+  AxiosResponse,
+  InternalAxiosRequestConfig
+} from 'axios'
 
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import qs from 'qs'
@@ -48,7 +55,7 @@ const service: AxiosInstance = axios.create({
 
 // request拦截器
 service.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
+  async (config: InternalAxiosRequestConfig) => {
     // 是否需要设置访问租户；该配置仅供前端请求拦截器使用，不作为请求头发送
     const isVisitTenant = config.headers.get('isVisitTenant') !== false
     config.headers.delete('isVisitTenant')
@@ -70,6 +77,7 @@ service.interceptors.request.use(
         config.headers['visit-tenant-id'] = visitTenantId
       }
     }
+    await prepareFieldRequest(config, config.fieldCrypto, fieldCrypto)
     const method = config.method?.toUpperCase()
     // 防止 GET 请求缓存
     if (method === 'GET') {
@@ -145,6 +153,14 @@ service.interceptors.response.use(
         return response.data
       }
       data = await new Response(response.data).json()
+    }
+    if (config.fieldCrypto?.response?.length) {
+      try {
+        data = await fieldCrypto.decryptFields(data, config.fieldCrypto.response)
+      } catch (error) {
+        ElMessage.error('响应字段解密失败，请检查加密配置')
+        return Promise.reject(error)
+      }
     }
     const code = data.code ?? result_code
     // 获取错误信息
