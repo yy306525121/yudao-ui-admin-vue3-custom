@@ -1,3 +1,5 @@
+import { fieldCrypto } from '@/utils/field-crypto/config'
+import { prepareFieldRequest } from '@/utils/field-crypto'
 import axios, {
   AxiosError,
   AxiosInstance,
@@ -42,7 +44,7 @@ const service: AxiosInstance = axios.create({
 
 // request拦截器
 service.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
+  async (config: InternalAxiosRequestConfig) => {
     // 是否需要设置 token
     let isToken = (config!.headers || {}).isToken === false
     whiteList.some((v) => {
@@ -59,6 +61,7 @@ service.interceptors.request.use(
       const tenantId = getTenantId()
       if (tenantId) (config as Recordable).headers['tenant-id'] = tenantId
     }
+    await prepareFieldRequest(config, config.fieldCrypto, fieldCrypto)
     const params = config.params || {}
     const data = config.data || false
     if (
@@ -106,6 +109,14 @@ service.interceptors.response.use(
         return response.data
       }
       data = await new Response(response.data).json()
+    }
+    if (config.fieldCrypto?.response?.length) {
+      try {
+        data = await fieldCrypto.decryptFields(data, config.fieldCrypto.response)
+      } catch (error) {
+        ElMessage.error('响应字段解密失败，请检查加密配置')
+        return Promise.reject(error)
+      }
     }
     const code = data.code || result_code
     // 获取错误信息
