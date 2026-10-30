@@ -16,8 +16,7 @@ export interface SmsLoginVO {
 export const login = (data: UserLoginVO) => {
   return request.post({
     url: '/system/auth/login',
-    data,
-    fieldCrypto: { request: ['password'], response: ['data.accessToken'] }
+    data
   })
 }
 
