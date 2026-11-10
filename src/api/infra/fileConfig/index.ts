@@ -11,6 +11,10 @@ export interface FileClientConfig {
   bucket?: string
   accessKey?: string
   accessSecret?: string
+  bucketName?: string
+  accessKeyId?: string
+  accessKeySecret?: string
+  allowedFileExtensions?: string[]
   enablePathStyleAccess?: boolean
   enablePublicAccess?: boolean
   region?: string

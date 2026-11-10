@@ -107,8 +107,66 @@
         <!-- 选填，无需参数校验 -->
         <el-input v-model="formData.config.region" placeholder="请填写区域，一般仅 AWS 需要填写" />
       </el-form-item>
+      <!-- 阿里云 OSS -->
+      <el-form-item
+        v-if="formData.storage === STORAGE_ALIYUN_OSS"
+        label="节点地址"
+        prop="config.endpoint"
+      >
+        <el-input
+          v-model="formData.config.endpoint"
+          placeholder="请输入节点地址，例如 oss-cn-hangzhou.aliyuncs.com"
+        />
+      </el-form-item>
+      <el-form-item
+        v-if="formData.storage === STORAGE_ALIYUN_OSS"
+        label="存储 bucket"
+        prop="config.bucketName"
+      >
+        <el-input v-model="formData.config.bucketName" placeholder="请输入 bucket" />
+      </el-form-item>
+      <el-form-item
+        v-if="formData.storage === STORAGE_ALIYUN_OSS"
+        label="accessKeyId"
+        prop="config.accessKeyId"
+      >
+        <el-input v-model="formData.config.accessKeyId" placeholder="请输入 accessKeyId" />
+      </el-form-item>
+      <el-form-item
+        v-if="formData.storage === STORAGE_ALIYUN_OSS"
+        label="accessKeySecret"
+        prop="config.accessKeySecret"
+      >
+        <el-input
+          v-model="formData.config.accessKeySecret"
+          type="password"
+          show-password
+          placeholder="请输入 accessKeySecret"
+        />
+      </el-form-item>
+      <el-form-item v-if="formData.storage === STORAGE_ALIYUN_OSS" label="允许上传类型">
+        <!-- 选填，无需参数校验；不选择时表示不限制 -->
+        <el-select
+          v-model="formData.config.allowedFileExtensions"
+          multiple
+          collapse-tags
+          collapse-tags-tooltip
+          placeholder="不选择表示不限制"
+          style="width: 100%"
+        >
+          <el-option
+            v-for="extension in ALIYUN_ALLOWED_FILE_EXTENSIONS"
+            :key="extension"
+            :label="extension"
+            :value="extension"
+          />
+        </el-select>
+      </el-form-item>
       <!-- 通用 -->
-      <el-form-item v-if="formData.storage === 20" label="自定义域名">
+      <el-form-item
+        v-if="formData.storage === 20 || formData.storage === STORAGE_ALIYUN_OSS"
+        label="自定义域名"
+      >
         <!-- 无需参数校验，所以去掉 prop -->
         <el-input v-model="formData.config.domain" placeholder="请输入自定义域名" />
       </el-form-item>
@@ -131,6 +189,9 @@ defineOptions({ name: 'InfraFileConfigForm' })
 
 const { t } = useI18n() // 国际化
 const message = useMessage() // 消息弹窗
+
+const STORAGE_ALIYUN_OSS = 21 // 阿里云 OSS 存储器
+const ALIYUN_ALLOWED_FILE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf']
 
 const dialogVisible = ref(false) // 弹窗的是否展示
 const dialogTitle = ref('') // 弹窗的标题
@@ -157,6 +218,9 @@ const formRules = reactive<FormRules>({
     bucket: [{ required: true, message: '存储 bucket 不能为空', trigger: 'blur' }],
     accessKey: [{ required: true, message: 'accessKey 不能为空', trigger: 'blur' }],
     accessSecret: [{ required: true, message: 'accessSecret 不能为空', trigger: 'blur' }],
+    bucketName: [{ required: true, message: '存储 bucket 不能为空', trigger: 'blur' }],
+    accessKeyId: [{ required: true, message: 'accessKeyId 不能为空', trigger: 'blur' }],
+    accessKeySecret: [{ required: true, message: 'accessKeySecret 不能为空', trigger: 'blur' }],
     enablePathStyleAccess: [
       { required: true, message: '是否 PathStyle 访问不能为空', trigger: 'change' }
     ],
