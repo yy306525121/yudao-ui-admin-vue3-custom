@@ -37,58 +37,73 @@ async function randomBytes(length) {
   throw new Error('当前运行平台不提供安全随机数 API')
 }
 
-export function transformFields(input, paths, operation) {
-  // async traversal returns a fresh JSON value, never mutates the caller's object.
-  return (async () => {
-    const partsList = paths.map((path) => {
-      if (
-        typeof path !== 'string' ||
-        !/^[A-Za-z_][A-Za-z0-9_]*(\[\*\])?(\.[A-Za-z_][A-Za-z0-9_]*(\[\*\])?)*$/.test(path)
-      )
-        throw new Error(`非法字段路径: ${path}`)
-      const parts = path.split('.')
-      if (parts.some((v) => forbidden.has(v.replace('[*]', ''))))
-        throw new Error(`非法字段路径: ${path}`)
-      return parts
-    })
+function assertFieldValue(value) {
+  if (typeof value === 'string') return
+  if (typeof value !== 'number') throw new Error('加密字段必须是字符串或数字')
+  if (!Number.isFinite(value)) throw new Error('加密字段必须是有限数字')
+  if (Number.isInteger(value) && !Number.isSafeInteger(value))
+    throw new Error('加密字段整数超出安全范围，请使用字符串')
+}
+
+// Validate selected values before JSON copying can turn NaN/Infinity into null.
+function collectFields(input, paths) {
+  const partsList = paths.map((path) => {
     if (
-      !input ||
-      typeof input !== 'object' ||
-      (!Array.isArray(input) &&
-        Object.getPrototypeOf(input) !== Object.prototype &&
-        Object.getPrototypeOf(input) !== null)
+      typeof path !== 'string' ||
+      !/^[A-Za-z_][A-Za-z0-9_]*(\[\*\])?(\.[A-Za-z_][A-Za-z0-9_]*(\[\*\])?)*$/.test(path)
     )
-      throw new Error('字段加解密仅支持 JSON 对象或数组')
-    const result = JSON.parse(JSON.stringify(input))
-    const visited = new Set()
-    async function leaf(parent, key, location) {
-      if (parent[key] == null || visited.has(location)) return
-      if (typeof parent[key] !== 'string') throw new Error(`加密字段必须是字符串: ${location}`)
-      visited.add(location)
-      parent[key] = await operation(parent[key])
-    }
-    async function walk(node, parts, offset, location) {
-      if (node == null) return
-      if (typeof node !== 'object' || Array.isArray(node))
-        throw new Error(`字段路径经过非对象: ${location}`)
-      const part = parts[offset],
-        array = part.endsWith('[*]'),
-        name = array ? part.slice(0, -3) : part
-      if (!Object.prototype.hasOwnProperty.call(node, name) || node[name] == null) return
-      const child = node[name],
-        next = `${location}/${name}`
-      if (array) {
-        if (!Array.isArray(child)) throw new Error(`字段不是数组: ${next}`)
-        for (let i = 0; i < child.length; i++) {
-          if (offset === parts.length - 1) await leaf(child, i, `${next}/${i}`)
-          else await walk(child[i], parts, offset + 1, `${next}/${i}`)
-        }
-      } else if (offset === parts.length - 1) await leaf(node, name, next)
-      else await walk(child, parts, offset + 1, next)
-    }
-    for (const parts of partsList) await walk(result, parts, 0, '')
-    return result
-  })()
+      throw new Error(`非法字段路径: ${path}`)
+    const parts = path.split('.')
+    if (parts.some((v) => forbidden.has(v.replace('[*]', ''))))
+      throw new Error(`非法字段路径: ${path}`)
+    return parts
+  })
+  if (
+    !input ||
+    typeof input !== 'object' ||
+    (!Array.isArray(input) &&
+      Object.getPrototypeOf(input) !== Object.prototype &&
+      Object.getPrototypeOf(input) !== null)
+  )
+    throw new Error('字段加解密仅支持 JSON 对象或数组')
+  const fields = []
+  const visited = new Set()
+  function leaf(parent, key, location) {
+    if (parent[key] == null || visited.has(location)) return
+    assertFieldValue(parent[key])
+    visited.add(location)
+    fields.push({ parent, key })
+  }
+  function walk(node, parts, offset, location) {
+    if (node == null) return
+    if (typeof node !== 'object' || Array.isArray(node))
+      throw new Error(`字段路径经过非对象: ${location}`)
+    const part = parts[offset],
+      array = part.endsWith('[*]'),
+      name = array ? part.slice(0, -3) : part
+    if (!Object.prototype.hasOwnProperty.call(node, name) || node[name] == null) return
+    const child = node[name],
+      next = `${location}/${name}`
+    if (array) {
+      if (!Array.isArray(child)) throw new Error(`字段不是数组: ${next}`)
+      for (let i = 0; i < child.length; i++) {
+        if (offset === parts.length - 1) leaf(child, i, `${next}/${i}`)
+        else walk(child[i], parts, offset + 1, `${next}/${i}`)
+      }
+    } else if (offset === parts.length - 1) leaf(node, name, next)
+    else walk(child, parts, offset + 1, next)
+  }
+  for (const parts of partsList) walk(input, parts, 0, '')
+  return fields
+}
+
+export async function transformFields(input, paths, operation) {
+  collectFields(input, paths)
+  const result = JSON.parse(JSON.stringify(input))
+  for (const { parent, key } of collectFields(result, paths)) {
+    parent[key] = await operation(parent[key])
+  }
+  return result
 }
 
 export function createFieldCrypto(settings) {
@@ -96,6 +111,7 @@ export function createFieldCrypto(settings) {
   if (!['AES', 'SM4', 'RSA', 'SM2'].includes(algorithm)) throw new Error('不支持的字段加密算法')
   const prefix = `fc:v1:${algorithm}:`
   async function encrypt(value) {
+    assertFieldValue(value)
     let encrypted
     const plain = utf8(JSON.stringify(value)),
       key = settings.requestKey
@@ -130,6 +146,7 @@ export function createFieldCrypto(settings) {
     return prefix + base64(encrypted)
   }
   async function decrypt(value) {
+    if (typeof value !== 'string') throw new Error('加密字段必须是密文字符串')
     if (!value.startsWith(prefix)) throw new Error('字段密文版本或算法不匹配')
     const data = unbase64(value.slice(prefix.length)),
       key = settings.responseKey
@@ -171,7 +188,7 @@ export function createFieldCrypto(settings) {
       if (plain.length === 0) throw new Error('SM2 字段认证失败')
     }
     const decoded = JSON.parse(text(plain))
-    if (typeof decoded !== 'string') throw new Error('字段明文必须是 JSON 字符串')
+    assertFieldValue(decoded)
     return decoded
   }
   return {
@@ -199,6 +216,7 @@ export async function prepareFieldRequest(config, rule, crypto) {
     throw new Error('字段加密仅支持 JSON 请求体')
   const storage = config.custom || config
   if (!Object.prototype.hasOwnProperty.call(storage, '__fieldCryptoPlainData')) {
+    collectFields(config.data, rule.request)
     storage.__fieldCryptoPlainData = JSON.parse(JSON.stringify(config.data))
   }
   config.data = await crypto.encryptFields(storage.__fieldCryptoPlainData, rule.request)

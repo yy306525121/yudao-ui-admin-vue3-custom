@@ -8,8 +8,8 @@ export interface FieldCryptoSettings {
   responseKey: string
 }
 export interface FieldCryptoClient {
-  encrypt(value: string): Promise<string>
-  decrypt(value: string): Promise<string>
+  encrypt(value: string | number): Promise<string>
+  decrypt(value: string): Promise<string | number>
   encryptFields(input: unknown, paths: string[]): Promise<any>
   decryptFields(input: unknown, paths: string[]): Promise<any>
 }
@@ -17,7 +17,7 @@ export function createFieldCrypto(settings: FieldCryptoSettings): FieldCryptoCli
 export function transformFields(
   input: unknown,
   paths: string[],
-  operation: (value: string) => string | Promise<string>
+  operation: (value: string | number) => string | number | Promise<string | number>
 ): Promise<any>
 export function prepareFieldRequest<T>(
   config: T,
